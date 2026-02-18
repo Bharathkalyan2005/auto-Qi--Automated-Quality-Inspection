@@ -1,20 +1,8 @@
 {
-  "version": 2,
-  "name": "autoqi-dashboard",
-  "builds": [
+  "rewrites": [
     {
-      "src": "autoqi_dashboard.html",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/",
-      "dest": "/autoqi_dashboard.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/$1"
+      "source": "/",
+      "destination": "/index.html"
     }
   ],
   "headers": [
