@@ -1,0 +1,45 @@
+# AutoQI — Automated Quality Inspection System
+# Python 3.10+
+
+# Core
+python-dotenv>=1.0.0
+
+# Computer Vision
+opencv-python>=4.8.0
+Pillow>=10.0.0
+
+# Deep Learning
+torch>=2.0.0
+torchvision>=0.15.0
+ultralytics>=8.0.0
+
+# API & Backend
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+
+# Dashboard
+streamlit>=1.28.0
+
+# Database
+asyncpg>=0.29.0
+sqlalchemy>=2.0.0
+redis>=5.0.0
+
+# MQTT
+paho-mqtt>=2.0.0
+
+# Claude / Anthropic
+anthropic>=0.18.0
+
+# Utils
+numpy>=1.24.0
+pydantic>=2.5.0
+aiofiles>=23.0.0
+
+# Export & Reports
+reportlab>=4.0.0
+pandas>=2.0.0
+
+# Testing
+pytest>=7.0.0
+httpx>=0.25.0

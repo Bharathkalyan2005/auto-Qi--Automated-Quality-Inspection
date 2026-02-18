@@ -1,0 +1,65 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_URL=postgresql+asyncpg://autoqi:autoqi@db:5432/autoqi
+      - REDIS_URL=redis://redis:6379/0
+      - MQTT_BROKER=mqtt
+      - MODEL_PATH=models/saved/yolov8_defect.pt
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./data:/app/data
+      - ./models/saved:/app/models/saved
+      - ./logs:/app/logs
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://api:8000
+    depends_on:
+      - api
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: autoqi
+      POSTGRES_PASSWORD: autoqi
+      POSTGRES_DB: autoqi
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U autoqi"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./docker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+
+volumes:
+  pgdata:

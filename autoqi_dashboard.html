@@ -1,0 +1,3029 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AutoQI - Automated Quality Inspection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: #0a0e14;
+            color: #e8e8e8;
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated background grid */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                radial-gradient(circle, rgba(0,255,178,0.15) 1px, transparent 1px);
+            background-size: 40px 40px;
+            animation: gridScroll 20s linear infinite;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes gridScroll {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(40px); }
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0,255,178,0.03) 0px,
+                transparent 2px,
+                transparent 4px
+            );
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Header */
+        header {
+            background: #111720;
+            border-bottom: 1px solid rgba(0,255,178,0.2);
+            padding: 1.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .logo {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #00FFB2 0%, #0096FF 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: 2px;
+            position: relative;
+        }
+
+        .logo-subtitle {
+            font-size: 0.75rem;
+            color: #888;
+            margin-top: 0.25rem;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            color: #00FFB2;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00FFB2;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 8px #00FFB2; }
+            50% { opacity: 0.5; box-shadow: 0 0 16px #00FFB2; }
+        }
+
+        .live-clock {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.25rem;
+            color: #0096FF;
+            font-weight: 600;
+        }
+
+        /* Scanning line animation */
+        .scan-line {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            width: 100%;
+            background: linear-gradient(90deg, 
+                transparent 0%, 
+                #00FFB2 50%, 
+                transparent 100%);
+            animation: scan 3s linear infinite;
+        }
+
+        @keyframes scan {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .stat-card {
+            background: rgba(17, 23, 32, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,255,178,0.2);
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(0,255,178,0.1) 0%, transparent 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .stat-card:hover {
+            box-shadow: 0 0 20px rgba(0,255,178,0.3);
+            transform: translateY(-2px);
+        }
+
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value.green { color: #00FFB2; }
+        .stat-value.red { color: #FF3B3B; }
+        .stat-value.blue { color: #0096FF; }
+
+        .sparkline {
+            height: 4px;
+            background: rgba(0,255,178,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .sparkline-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00FFB2, #0096FF);
+            animation: sparklineGrow 1.5s ease-out;
+        }
+
+        @keyframes sparklineGrow {
+            from { width: 0; }
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin: 2rem 0 1.5rem;
+            border-bottom: 1px solid rgba(0,255,178,0.1);
+            padding-bottom: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            border-radius: 20px;
+            background: #111720;
+            border: 1px solid rgba(0,255,178,0.2);
+            color: #888;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+
+        .tab:hover {
+            box-shadow: 0 0 15px rgba(0,255,178,0.3);
+            color: #00FFB2;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #00FFB2 0%, #0096FF 100%);
+            color: #0a0e14;
+            border-color: transparent;
+            box-shadow: 0 4px 15px rgba(0,255,178,0.4);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeSlideIn 0.4s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed rgba(0,255,178,0.3);
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(17, 23, 32, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 2px dashed rgba(0,255,178,0.5);
+            border-radius: 12px;
+            animation: rotateBorder 20s linear infinite;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .upload-zone:hover::before {
+            opacity: 1;
+        }
+
+        @keyframes rotateBorder {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .upload-zone:hover {
+            border-color: #00FFB2;
+            box-shadow: 0 0 30px rgba(0,255,178,0.3);
+            background: rgba(0,255,178,0.05);
+        }
+
+        .upload-zone.dragover {
+            border-color: #00FFB2;
+            box-shadow: 0 0 40px rgba(0,255,178,0.5);
+            background: rgba(0,255,178,0.1);
+        }
+
+        .upload-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            animation: pulseIcon 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseIcon {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.1); opacity: 1; }
+        }
+
+        .upload-text {
+            font-size: 1.25rem;
+            color: #00FFB2;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-hint {
+            font-size: 0.875rem;
+            color: #888;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin: 2rem 0;
+            display: none;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            height: 6px;
+            background: rgba(0,255,178,0.2);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00FFB2, #0096FF);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px #00FFB2;
+        }
+
+        .progress-text {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            color: #888;
+            text-align: center;
+        }
+
+        /* Result Display */
+        .result-container {
+            display: none;
+            margin-top: 2rem;
+        }
+
+        .result-container.active {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            animation: fadeSlideIn 0.5s ease-out;
+        }
+
+        .result-image {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 3px solid;
+            max-height: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        .result-image.pass {
+            border-color: #00FFB2;
+            box-shadow: 0 0 30px rgba(0,255,178,0.3);
+            animation: passFlash 0.5s ease-out;
+        }
+
+        .result-image.fail {
+            border-color: #FF3B3B;
+            box-shadow: 0 0 30px rgba(255,59,59,0.3);
+            animation: failShake 0.5s ease-out;
+        }
+
+        @keyframes passFlash {
+            0% { box-shadow: 0 0 50px rgba(0,255,178,0.8); }
+            100% { box-shadow: 0 0 30px rgba(0,255,178,0.3); }
+        }
+
+        @keyframes failShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .result-image img {
+            max-width: 100%;
+            max-height: 100%;
+            display: block;
+        }
+
+        .result-overlay {
+            position: absolute;
+            top: 1rem;
+            left: 1rem;
+            padding: 0.5rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1.5rem;
+            font-family: 'IBM Plex Mono', monospace;
+            animation: popIn 0.3s ease-out;
+        }
+
+        @keyframes popIn {
+            from { transform: scale(0); }
+            to { transform: scale(1); }
+        }
+
+        .result-overlay.pass {
+            background: rgba(0,255,178,0.9);
+            color: #0a0e14;
+        }
+
+        .result-overlay.fail {
+            background: rgba(255,59,59,0.9);
+            color: #fff;
+        }
+
+        .result-panel {
+            background: rgba(17, 23, 32, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,255,178,0.2);
+            border-radius: 12px;
+            padding: 2rem;
+        }
+
+        .result-badge {
+            display: inline-block;
+            padding: 1rem 2rem;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            animation: popIn 0.5s ease-out;
+        }
+
+        .result-badge.pass {
+            background: #00FFB2;
+            color: #0a0e14;
+        }
+
+        .result-badge.fail {
+            background: #FF3B3B;
+            color: #fff;
+        }
+
+        .confidence-ring {
+            width: 120px;
+            height: 120px;
+            margin: 1.5rem auto;
+            position: relative;
+        }
+
+        .confidence-ring svg {
+            transform: rotate(-90deg);
+        }
+
+        .confidence-ring circle {
+            fill: none;
+            stroke-width: 8;
+        }
+
+        .confidence-bg {
+            stroke: rgba(0,255,178,0.2);
+        }
+
+        .confidence-progress {
+            stroke: #00FFB2;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1s ease-out;
+        }
+
+        .confidence-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #00FFB2;
+        }
+
+        .result-details {
+            margin-top: 1.5rem;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(0,255,178,0.1);
+        }
+
+        .detail-label {
+            color: #888;
+            font-size: 0.875rem;
+        }
+
+        .detail-value {
+            font-family: 'IBM Plex Mono', monospace;
+            color: #00FFB2;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00FFB2 0%, #0096FF 100%);
+            color: #0a0e14;
+            box-shadow: 0 4px 15px rgba(0,255,178,0.3);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 6px 20px rgba(0,255,178,0.5);
+        }
+
+        .btn-secondary {
+            background: #111720;
+            color: #00FFB2;
+            border: 1px solid rgba(0,255,178,0.3);
+        }
+
+        .btn-secondary:hover {
+            box-shadow: 0 0 15px rgba(0,255,178,0.3);
+        }
+
+        .btn-danger {
+            background: #FF3B3B;
+            color: #fff;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1.5rem;
+            background: rgba(17, 23, 32, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .data-table th {
+            background: rgba(0,255,178,0.1);
+            padding: 1rem;
+            text-align: left;
+            font-weight: 600;
+            color: #00FFB2;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .data-table td {
+            padding: 1rem;
+            border-top: 1px solid rgba(0,255,178,0.1);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+        }
+
+        .data-table tr:hover {
+            background: rgba(0,255,178,0.05);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        .badge.pass {
+            background: rgba(0,255,178,0.2);
+            color: #00FFB2;
+        }
+
+        .badge.fail {
+            background: rgba(255,59,59,0.2);
+            color: #FF3B3B;
+        }
+
+        .badge.ready {
+            background: rgba(0,255,178,0.2);
+            color: #00FFB2;
+        }
+
+        .badge.submitted {
+            background: rgba(0,255,178,0.2);
+            color: #00FFB2;
+        }
+
+        .badge.missing {
+            background: rgba(255,59,59,0.2);
+            color: #FF3B3B;
+        }
+
+        /* History Items */
+        .history-item {
+            background: rgba(17, 23, 32, 0.6);
+            backdrop-filter: blur(10px);
+            border-left: 4px solid;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .history-item.pass {
+            border-left-color: #00FFB2;
+        }
+
+        .history-item.fail {
+            border-left-color: #FF3B3B;
+            box-shadow: 0 0 15px rgba(255,59,59,0.2);
+        }
+
+        .history-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 4px 20px rgba(0,255,178,0.2);
+        }
+
+        .history-info {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .history-icon {
+            font-size: 2rem;
+        }
+
+        /* Export Cards */
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .export-card {
+            background: rgba(17, 23, 32, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,255,178,0.2);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        .export-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,255,178,0.3);
+        }
+
+        .export-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .export-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: #00FFB2;
+        }
+
+        .export-description {
+            color: #888;
+            font-size: 0.875rem;
+            margin-bottom: 1rem;
+        }
+
+        .export-count {
+            font-family: 'IBM Plex Mono', monospace;
+            color: #0096FF;
+            font-size: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* File Upload Areas */
+        .upload-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .file-list {
+            margin-top: 1.5rem;
+        }
+
+        .file-item {
+            background: rgba(17, 23, 32, 0.6);
+            border: 1px solid rgba(0,255,178,0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-info {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            flex: 1;
+        }
+
+        .file-icon {
+            font-size: 1.5rem;
+        }
+
+        .file-details {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #00FFB2;
+            margin-bottom: 0.25rem;
+        }
+
+        .file-meta {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-small {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.75rem;
+        }
+
+        /* Alert Banner */
+        .alert {
+            background: rgba(255,59,59,0.2);
+            border: 1px solid #FF3B3B;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            animation: alertPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes alertPulse {
+            0%, 100% { box-shadow: 0 0 10px rgba(255,59,59,0.3); }
+            50% { box-shadow: 0 0 20px rgba(255,59,59,0.6); }
+        }
+
+        .alert-icon {
+            font-size: 1.5rem;
+            color: #FF3B3B;
+        }
+
+        .alert-text {
+            color: #FF3B3B;
+            font-weight: 600;
+        }
+
+        /* Status Dots */
+        .status-dot-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-dot-green {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #00FFB2;
+            box-shadow: 0 0 8px #00FFB2;
+        }
+
+        .status-dot-red {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #FF3B3B;
+            box-shadow: 0 0 8px #FF3B3B;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        /* Donut Chart */
+        .donut-chart {
+            width: 200px;
+            height: 200px;
+            margin: 2rem auto;
+            position: relative;
+        }
+
+        .donut-chart svg {
+            transform: rotate(-90deg);
+        }
+
+        .donut-segment {
+            fill: none;
+            stroke-width: 30;
+            transition: stroke-dashoffset 1s ease-out;
+        }
+
+        .donut-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .donut-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 2rem;
+            font-weight: 700;
+            color: #00FFB2;
+        }
+
+        .donut-label {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        /* Horizontal Bar */
+        .horizontal-bar {
+            height: 40px;
+            background: rgba(0,255,178,0.2);
+            border-radius: 20px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+            position: relative;
+        }
+
+        .horizontal-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00FFB2, #0096FF);
+            transition: width 1.5s ease-out;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 1rem;
+            box-shadow: 0 0 20px rgba(0,255,178,0.5);
+        }
+
+        .horizontal-bar-text {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 700;
+            color: #0a0e14;
+        }
+
+        /* Form */
+        .form-inline {
+            background: rgba(17, 23, 32, 0.6);
+            border: 1px solid rgba(0,255,178,0.2);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .form-inline.active {
+            display: block;
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-label {
+            font-size: 0.875rem;
+            color: #888;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,255,178,0.3);
+            border-radius: 6px;
+            padding: 0.75rem;
+            color: #e8e8e8;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #00FFB2;
+            box-shadow: 0 0 10px rgba(0,255,178,0.3);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        /* Section Headers */
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #00FFB2;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: rgba(17, 23, 32, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,255,178,0.3);
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            min-width: 300px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            animation: toastSlideIn 0.3s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .toast::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: #00FFB2;
+        }
+
+        .toast.success::before { background: #00FFB2; }
+        .toast.error::before { background: #FF3B3B; }
+        .toast.warning::before { background: #FFA500; }
+        .toast.info::before { background: #0096FF; }
+
+        @keyframes toastSlideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .toast-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .toast-title {
+            font-weight: 700;
+            color: #00FFB2;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 1.25rem;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .toast-close:hover {
+            color: #fff;
+        }
+
+        .toast-message {
+            color: #e8e8e8;
+            font-size: 0.9rem;
+        }
+
+        /* Settings Panel */
+        .settings-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #00FFB2 0%, #0096FF 100%);
+            border: none;
+            color: #0a0e14;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(0,255,178,0.5);
+            z-index: 999;
+            transition: all 0.3s ease;
+        }
+
+        .settings-btn:hover {
+            transform: scale(1.1) rotate(90deg);
+            box-shadow: 0 6px 30px rgba(0,255,178,0.7);
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: -400px;
+            width: 400px;
+            height: 100vh;
+            background: rgba(17, 23, 32, 0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(0,255,178,0.3);
+            box-shadow: -4px 0 30px rgba(0,0,0,0.5);
+            z-index: 1001;
+            transition: right 0.4s ease;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .settings-panel.active {
+            right: 0;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(0,255,178,0.2);
+        }
+
+        .settings-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #00FFB2;
+        }
+
+        .settings-close {
+            background: none;
+            border: none;
+            color: #888;
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+
+        .settings-section {
+            margin-bottom: 2rem;
+        }
+
+        .settings-label {
+            font-weight: 600;
+            color: #00FFB2;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+        }
+
+        .switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            background: rgba(0,255,178,0.2);
+            border-radius: 13px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .switch.active {
+            background: #00FFB2;
+        }
+
+        .switch-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .switch.active .switch-slider {
+            transform: translateX(24px);
+        }
+
+        /* Search Bar */
+        .search-bar {
+            position: relative;
+            margin-bottom: 1.5rem;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.75rem 1rem 0.75rem 3rem;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(0,255,178,0.3);
+            border-radius: 8px;
+            color: #e8e8e8;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9rem;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #00FFB2;
+            box-shadow: 0 0 15px rgba(0,255,178,0.3);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #888;
+            font-size: 1.25rem;
+        }
+
+        /* Trend Chart */
+        .trend-chart {
+            background: rgba(17, 23, 32, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,255,178,0.2);
+            border-radius: 12px;
+            padding: 2rem;
+            margin: 2rem 0;
+        }
+
+        .chart-canvas {
+            width: 100%;
+            height: 200px;
+            position: relative;
+        }
+
+        .chart-bar {
+            position: absolute;
+            bottom: 0;
+            background: linear-gradient(to top, #00FFB2, #0096FF);
+            border-radius: 4px 4px 0 0;
+            transition: height 0.5s ease;
+            cursor: pointer;
+        }
+
+        .chart-bar:hover {
+            opacity: 0.8;
+        }
+
+        /* Fullscreen Mode */
+        .fullscreen-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(10, 14, 20, 0.98);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .fullscreen-overlay.active {
+            display: flex;
+        }
+
+        .fullscreen-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+
+        .fullscreen-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: rgba(255,59,59,0.8);
+            border: none;
+            color: #fff;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+
+        .fullscreen-close:hover {
+            background: #FF3B3B;
+        }
+
+        /* Keyboard Shortcuts Help */
+        .shortcuts-help {
+            position: fixed;
+            bottom: 80px;
+            left: 20px;
+            background: rgba(17, 23, 32, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0,255,178,0.3);
+            border-radius: 8px;
+            padding: 1rem;
+            z-index: 998;
+            display: none;
+        }
+
+        .shortcuts-help.active {
+            display: block;
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+
+        .shortcut-item {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .shortcut-key {
+            background: rgba(0,255,178,0.2);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            color: #00FFB2;
+            font-weight: 700;
+        }
+
+        .shortcut-desc {
+            color: #888;
+        }
+
+        /* Performance Badge */
+        .perf-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            font-family: 'IBM Plex Mono', monospace;
+            margin-left: 0.5rem;
+        }
+
+        .perf-excellent {
+            background: rgba(0,255,178,0.2);
+            color: #00FFB2;
+        }
+
+        .perf-good {
+            background: rgba(0,150,255,0.2);
+            color: #0096FF;
+        }
+
+        .perf-average {
+            background: rgba(255,165,0,0.2);
+            color: #FFA500;
+        }
+
+        .perf-poor {
+            background: rgba(255,59,59,0.2);
+            color: #FF3B3B;
+        }
+
+        /* Multi-select checkbox */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(0,255,178,0.3);
+            border-radius: 4px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .checkbox.checked {
+            background: #00FFB2;
+            border-color: #00FFB2;
+        }
+
+        .checkbox.checked::after {
+            content: '✓';
+            position: absolute;
+            top: -2px;
+            left: 2px;
+            color: #0a0e14;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Batch Actions Bar */
+        .batch-actions {
+            position: fixed;
+            bottom: -80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(17, 23, 32, 0.98);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(0,255,178,0.3);
+            border-radius: 12px;
+            padding: 1rem 2rem;
+            box-shadow: 0 -4px 30px rgba(0,0,0,0.5);
+            z-index: 997;
+            transition: bottom 0.4s ease;
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .batch-actions.active {
+            bottom: 20px;
+        }
+
+        .batch-count {
+            font-family: 'IBM Plex Mono', monospace;
+            color: #00FFB2;
+            font-weight: 700;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .upload-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .result-container.active {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .settings-panel {
+                width: 100%;
+                right: -100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="header-content">
+                <div>
+                    <div class="logo">AutoQI</div>
+                    <div class="logo-subtitle">Automated Quality Inspection</div>
+                </div>
+                <div class="header-right">
+                    <div class="status-indicator">
+                        <span class="status-dot"></span>
+                        SYSTEM ONLINE
+                    </div>
+                    <div class="live-clock" id="liveClock">--:--:--</div>
+                </div>
+                <div class="scan-line"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Stats Cards -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Inspections</div>
+                <div class="stat-value blue" id="totalInspections">0</div>
+                <div class="sparkline">
+                    <div class="sparkline-fill" style="width: 100%"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Pass Rate</div>
+                <div class="stat-value green" id="passRate">0%</div>
+                <div class="sparkline">
+                    <div class="sparkline-fill" style="width: 0%" id="passSparkline"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Fail Rate</div>
+                <div class="stat-value red" id="failRate">0%</div>
+                <div class="sparkline">
+                    <div class="sparkline-fill" style="width: 0%" id="failSparkline"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <div class="tab active" data-tab="inspect">🔬 Inspect</div>
+            <div class="tab" data-tab="stats">📊 Stats</div>
+            <div class="tab" data-tab="history">📋 History</div>
+            <div class="tab" data-tab="data-upload">📁 Data Upload</div>
+            <div class="tab" data-tab="compliance">👷 Compliance</div>
+            <div class="tab" data-tab="export">⬇️ Export</div>
+        </div>
+
+        <!-- Tab Contents -->
+        
+        <!-- INSPECT TAB -->
+        <div class="tab-content active" id="inspect">
+            <div class="upload-zone" id="uploadZone">
+                <div class="upload-icon">📸</div>
+                <div class="upload-text">Drop image here or click to upload</div>
+                <div class="upload-hint">Supports JPG, PNG (max 10MB)</div>
+                <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            </div>
+
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="progress-text" id="progressText">Processing...</div>
+            </div>
+
+            <div class="result-container" id="resultContainer">
+                <div class="result-image" id="resultImage">
+                    <img id="resultImg" src="" alt="Inspected Image">
+                    <div class="result-overlay" id="resultOverlay"></div>
+                </div>
+                <div class="result-panel">
+                    <div class="result-badge" id="resultBadge"></div>
+                    
+                    <div class="confidence-ring">
+                        <svg width="120" height="120">
+                            <circle class="confidence-bg" cx="60" cy="60" r="52"></circle>
+                            <circle class="confidence-progress" id="confidenceCircle" cx="60" cy="60" r="52"></circle>
+                        </svg>
+                        <div class="confidence-text" id="confidenceText">0%</div>
+                    </div>
+
+                    <div class="result-details" id="resultDetails"></div>
+
+                    <div class="btn-group">
+                        <button class="btn btn-primary" id="downloadJSONBtn">Download JSON</button>
+                        <button class="btn btn-secondary" id="runAgainBtn">Run Again</button>
+                        <button class="btn btn-secondary" onclick="toggleFullscreen()" title="Fullscreen (F)">🖼️ Fullscreen</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STATS TAB -->
+        <div class="tab-content" id="stats">
+            <div class="section-header">
+                <div class="section-title">Performance Metrics <span class="perf-badge perf-average">N/A</span></div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Total</div>
+                    <div class="stat-value blue" id="statsTotal">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pass</div>
+                    <div class="stat-value green" id="statsPass">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Fail</div>
+                    <div class="stat-value red" id="statsFail">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Pass Rate</div>
+                    <div class="stat-value green" id="statsPassRate">0%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Fail Rate</div>
+                    <div class="stat-value red" id="statsFailRate">0%</div>
+                </div>
+            </div>
+
+            <div class="section-title" style="margin-top: 2rem;">Pass Rate Distribution</div>
+            <div class="horizontal-bar">
+                <div class="horizontal-bar-fill" id="passRateBar" style="width: 0%">
+                    <span class="horizontal-bar-text" id="passRateBarText">0%</span>
+                </div>
+            </div>
+
+            <div class="donut-chart">
+                <svg width="200" height="200">
+                    <circle class="donut-segment" cx="100" cy="100" r="85" 
+                            stroke="#00FFB2" id="donutPass"
+                            stroke-dasharray="0 534" />
+                    <circle class="donut-segment" cx="100" cy="100" r="85" 
+                            stroke="#FF3B3B" id="donutFail"
+                            stroke-dasharray="0 534" />
+                </svg>
+                <div class="donut-center">
+                    <div class="donut-value" id="donutValue">0</div>
+                    <div class="donut-label">Inspections</div>
+                </div>
+            </div>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Defect Type</th>
+                        <th>Count</th>
+                        <th>Percentage</th>
+                    </tr>
+                </thead>
+                <tbody id="defectTableBody">
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: #888;">No data yet</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- HISTORY TAB -->
+        <div class="tab-content" id="history">
+            <div class="section-header">
+                <div class="section-title">Inspection History</div>
+                <button class="btn btn-primary" id="downloadHistoryCSV">Download All (CSV)</button>
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" placeholder="Search by filename, result, worker ID..." 
+                       oninput="searchHistory(this.value)">
+            </div>
+            
+            <div id="historyList">
+                <div style="text-align: center; color: #888; padding: 3rem;">
+                    No inspections yet
+                </div>
+            </div>
+        </div>
+
+        <!-- DATA UPLOAD TAB -->
+        <div class="tab-content" id="data-upload">
+            <div class="upload-grid">
+                <div>
+                    <div class="section-title">Training Dataset</div>
+                    <div class="upload-zone" id="trainingUploadZone" style="margin-top: 1rem;">
+                        <div class="upload-icon">📦</div>
+                        <div class="upload-text">Upload Training Data</div>
+                        <div class="upload-hint">ZIP, CSV, JSON</div>
+                        <input type="file" id="trainingInput" accept=".zip,.csv,.json" style="display: none;">
+                    </div>
+                    <div class="file-list" id="trainingFileList"></div>
+                </div>
+                <div>
+                    <div class="section-title">Worker Documents</div>
+                    <div class="upload-zone" id="workerUploadZone" style="margin-top: 1rem;">
+                        <div class="upload-icon">📄</div>
+                        <div class="upload-text">Upload Documents</div>
+                        <div class="upload-hint">PDF, DOCX, XLSX</div>
+                        <input type="file" id="workerInput" accept=".pdf,.docx,.xlsx" style="display: none;">
+                    </div>
+                    <div class="file-list" id="workerFileList"></div>
+                </div>
+            </div>
+
+            <div class="section-title" style="margin-top: 3rem;">System Downloads</div>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="downloadInspectionReport">Download Inspection Report (CSV)</button>
+                <button class="btn btn-primary" id="downloadComplianceLog">Download Compliance Log (CSV)</button>
+                <button class="btn btn-primary" id="downloadSystemConfig">Download System Config (JSON)</button>
+            </div>
+        </div>
+
+        <!-- COMPLIANCE TAB -->
+        <div class="tab-content" id="compliance">
+            <div class="alert" id="complianceAlert" style="display: none;">
+                <div class="alert-icon">⚠️</div>
+                <div class="alert-text">Warning: <span id="missingCount">0</span> worker(s) missing required documents</div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">Compliant</div>
+                    <div class="stat-value green" id="compliantCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Missing</div>
+                    <div class="stat-value red" id="missingWorkerCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Compliance Rate</div>
+                    <div class="stat-value blue" id="complianceRate">100%</div>
+                </div>
+            </div>
+
+            <div class="section-header">
+                <div class="section-title">Worker Documents</div>
+                <button class="btn btn-primary" id="addWorkerBtn">+ Add Worker</button>
+            </div>
+
+            <!-- Search Bar -->
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input type="text" class="search-input" placeholder="Search by worker ID, name, shift..."
+                       oninput="searchCompliance(this.value)">
+            </div>
+
+            <div class="form-inline" id="addWorkerForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Worker ID</label>
+                        <input type="text" class="form-input" id="workerIdInput" placeholder="W-001">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" id="workerNameInput" placeholder="John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Shift</label>
+                        <input type="text" class="form-input" id="workerShiftInput" placeholder="Morning">
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="submitWorkerBtn">Add Worker</button>
+            </div>
+
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Worker ID</th>
+                        <th>Name</th>
+                        <th>Shift</th>
+                        <th>Document</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="workerTableBody">
+                </tbody>
+            </table>
+        </div>
+
+        <!-- EXPORT TAB -->
+        <div class="tab-content" id="export">
+            <div class="export-grid">
+                <div class="export-card">
+                    <div class="export-icon">📊</div>
+                    <div class="export-title">Inspection Report</div>
+                    <div class="export-description">Complete inspection log with results and metadata</div>
+                    <div class="export-count" id="exportInspectionCount">0 records</div>
+                    <button class="btn btn-primary" id="exportInspectionCSV">Download CSV</button>
+                </div>
+                <div class="export-card">
+                    <div class="export-icon">👷</div>
+                    <div class="export-title">Worker Compliance</div>
+                    <div class="export-description">Worker document submission status</div>
+                    <div class="export-count" id="exportComplianceCount">0 workers</div>
+                    <button class="btn btn-primary" id="exportComplianceCSV">Download CSV</button>
+                </div>
+                <div class="export-card">
+                    <div class="export-icon">⚙️</div>
+                    <div class="export-title">System Config</div>
+                    <div class="export-description">Dashboard configuration and settings</div>
+                    <div class="export-count">1 file</div>
+                    <button class="btn btn-primary" id="exportConfigJSON">Download JSON</button>
+                </div>
+                <div class="export-card">
+                    <div class="export-icon">📦</div>
+                    <div class="export-title">Full Report</div>
+                    <div class="export-description">Complete system data export</div>
+                    <div class="export-count" id="exportFullCount">All data</div>
+                    <button class="btn btn-primary" id="exportFullJSON">Download JSON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Application State
+        const state = {
+            inspections: [],
+            workers: [
+                { id: 'W-001', name: 'John Martinez', shift: 'Morning', document: 'Safety_Cert.pdf', time: '08:30', status: 'SUBMITTED' },
+                { id: 'W-002', name: 'Sarah Chen', shift: 'Afternoon', document: 'Training_Doc.pdf', time: '14:15', status: 'SUBMITTED' },
+                { id: 'W-003', name: 'Mike Johnson', shift: 'Night', document: null, time: null, status: 'MISSING' },
+                { id: 'W-004', name: 'Lisa Brown', shift: 'Morning', document: 'Compliance.pdf', time: '09:00', status: 'SUBMITTED' }
+            ],
+            uploadedFiles: {
+                training: [],
+                worker: []
+            },
+            currentInspection: null
+        };
+
+        // Live Clock
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            document.getElementById('liveClock').textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Tab Switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(tabName).classList.add('active');
+
+                // Update stats when switching to stats tab
+                if (tabName === 'stats') {
+                    updateStatsTab();
+                }
+            });
+        });
+
+        // Animate Numbers
+        function animateNumber(element, start, end, duration) {
+            const range = end - start;
+            const increment = range / (duration / 16);
+            let current = start;
+            
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                    current = end;
+                    clearInterval(timer);
+                }
+                
+                if (element.textContent.includes('%')) {
+                    element.textContent = Math.round(current) + '%';
+                } else {
+                    element.textContent = Math.round(current);
+                }
+            }, 16);
+        }
+
+        // Update Stats
+        function updateStats() {
+            const total = state.inspections.length;
+            const passed = state.inspections.filter(i => i.result === 'PASS').length;
+            const failed = total - passed;
+            const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+            const failRate = total > 0 ? Math.round((failed / total) * 100) : 0;
+
+            animateNumber(document.getElementById('totalInspections'), 0, total, 500);
+            document.getElementById('passRate').textContent = passRate + '%';
+            document.getElementById('failRate').textContent = failRate + '%';
+
+            document.getElementById('passSparkline').style.width = passRate + '%';
+            document.getElementById('failSparkline').style.width = failRate + '%';
+        }
+
+        // Image Upload - Inspect Tab
+        const uploadZone = document.getElementById('uploadZone');
+        const imageInput = document.getElementById('imageInput');
+        const progressContainer = document.getElementById('progressContainer');
+        const resultContainer = document.getElementById('resultContainer');
+
+        uploadZone.addEventListener('click', () => imageInput.click());
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                processImage(file);
+            }
+        });
+
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                processImage(file);
+            }
+        });
+
+        function processImage(file) {
+            uploadZone.style.display = 'none';
+            progressContainer.classList.add('active');
+            
+            const progressFill = document.getElementById('progressFill');
+            let progress = 0;
+            
+            const interval = setInterval(() => {
+                progress += 5;
+                progressFill.style.width = progress + '%';
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(() => {
+                        performInspection(file);
+                    }, 300);
+                }
+            }, 30);
+        }
+
+        function performInspection(file) {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                const imageUrl = e.target.result;
+                
+                // Mock inspection result
+                const isPassed = Math.random() > 0.3;
+                const confidence = Math.floor(Math.random() * 15) + 85;
+                const defectTypes = ['Scratch', 'Dent', 'Discoloration', 'Crack', 'Deformation', 'None'];
+                const defectType = isPassed ? 'None' : defectTypes[Math.floor(Math.random() * (defectTypes.length - 1))];
+                const inferenceTime = Math.floor(Math.random() * 50) + 10;
+                const workerIds = ['W-001', 'W-002', 'W-004'];
+                const workerId = workerIds[Math.floor(Math.random() * workerIds.length)];
+                
+                const inspection = {
+                    id: Date.now(),
+                    filename: file.name,
+                    imageUrl: imageUrl,
+                    result: isPassed ? 'PASS' : 'FAIL',
+                    confidence: confidence,
+                    defectType: defectType,
+                    inferenceTime: inferenceTime,
+                    timestamp: new Date().toISOString(),
+                    workerId: workerId
+                };
+                
+                state.inspections.push(inspection);
+                state.currentInspection = inspection;
+                
+                displayResult(inspection);
+                updateStats();
+                updateHistory();
+            };
+            
+            reader.readAsDataURL(file);
+        }
+
+        function displayResult(inspection) {
+            progressContainer.classList.remove('active');
+            resultContainer.classList.add('active');
+            
+            const resultImage = document.getElementById('resultImage');
+            const resultImg = document.getElementById('resultImg');
+            const resultOverlay = document.getElementById('resultOverlay');
+            const resultBadge = document.getElementById('resultBadge');
+            
+            resultImg.src = inspection.imageUrl;
+            
+            if (inspection.result === 'PASS') {
+                resultImage.className = 'result-image pass';
+                resultOverlay.className = 'result-overlay pass';
+                resultOverlay.textContent = 'PASS';
+                resultBadge.className = 'result-badge pass';
+                resultBadge.textContent = 'PASS';
+            } else {
+                resultImage.className = 'result-image fail';
+                resultOverlay.className = 'result-overlay fail';
+                resultOverlay.textContent = 'FAIL';
+                resultBadge.className = 'result-badge fail';
+                resultBadge.textContent = 'FAIL';
+            }
+            
+            // Animate confidence ring
+            const circumference = 2 * Math.PI * 52;
+            const confidenceCircle = document.getElementById('confidenceCircle');
+            const offset = circumference - (inspection.confidence / 100) * circumference;
+            confidenceCircle.style.strokeDasharray = `${circumference} ${circumference}`;
+            confidenceCircle.style.strokeDashoffset = circumference;
+            
+            setTimeout(() => {
+                confidenceCircle.style.strokeDashoffset = offset;
+            }, 100);
+            
+            animateNumber(document.getElementById('confidenceText'), 0, inspection.confidence, 1000);
+            
+            // Display details
+            const details = document.getElementById('resultDetails');
+            details.innerHTML = `
+                <div class="detail-row">
+                    <span class="detail-label">Confidence</span>
+                    <span class="detail-value">${inspection.confidence}%</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Defect Type</span>
+                    <span class="detail-value">${inspection.defectType}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Inference Time</span>
+                    <span class="detail-value">${inspection.inferenceTime} ms</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Timestamp</span>
+                    <span class="detail-value">${new Date(inspection.timestamp).toLocaleString()}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Worker ID</span>
+                    <span class="detail-value">${inspection.workerId}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Filename</span>
+                    <span class="detail-value">${inspection.filename}</span>
+                </div>
+            `;
+        }
+
+        // Download JSON
+        document.getElementById('downloadJSONBtn').addEventListener('click', () => {
+            if (!state.currentInspection) return;
+            
+            const blob = new Blob([JSON.stringify(state.currentInspection, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `inspection_${state.currentInspection.id}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Run Again
+        document.getElementById('runAgainBtn').addEventListener('click', () => {
+            resultContainer.classList.remove('active');
+            uploadZone.style.display = 'block';
+            imageInput.value = '';
+            state.currentInspection = null;
+        });
+
+        // Update History
+        function updateHistory() {
+            const historyList = document.getElementById('historyList');
+            
+            if (state.inspections.length === 0) {
+                historyList.innerHTML = '<div style="text-align: center; color: #888; padding: 3rem;">No inspections yet</div>';
+                return;
+            }
+            
+            historyList.innerHTML = state.inspections.map(insp => `
+                <div class="history-item ${insp.result.toLowerCase()}">
+                    <div class="history-info">
+                        <div class="history-icon">📸</div>
+                        <div>
+                            <div style="font-weight: 600;">${insp.filename}</div>
+                            <div style="font-size: 0.875rem; color: #888; font-family: 'IBM Plex Mono', monospace;">
+                                ${new Date(insp.timestamp).toLocaleString()}
+                            </div>
+                        </div>
+                        <span class="badge ${insp.result.toLowerCase()}">${insp.result}</span>
+                        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.875rem;">
+                            ${insp.defectType}
+                        </div>
+                        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.875rem; color: #00FFB2;">
+                            ${insp.confidence}% confidence
+                        </div>
+                        <div style="font-family: 'IBM Plex Mono', monospace; font-size: 0.875rem; color: #888;">
+                            ${insp.inferenceTime} ms
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary btn-small" onclick="downloadInspectionJSON(${insp.id})">Download JSON</button>
+                </div>
+            `).reverse().join('');
+        }
+
+        // Download inspection JSON
+        function downloadInspectionJSON(id) {
+            const inspection = state.inspections.find(i => i.id === id);
+            if (!inspection) return;
+            
+            const blob = new Blob([JSON.stringify(inspection, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `inspection_${id}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Download History CSV
+        document.getElementById('downloadHistoryCSV').addEventListener('click', () => {
+            if (state.inspections.length === 0) return;
+            
+            const headers = ['Timestamp', 'Filename', 'Result', 'Confidence', 'Defect Type', 'Inference Time (ms)', 'Worker ID'];
+            const rows = state.inspections.map(i => [
+                new Date(i.timestamp).toISOString(),
+                i.filename,
+                i.result,
+                i.confidence,
+                i.defectType,
+                i.inferenceTime,
+                i.workerId
+            ]);
+            
+            const csv = [headers, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'inspection_history.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+
+        // Stats Tab Updates
+        function updateStatsTab() {
+            const total = state.inspections.length;
+            const passed = state.inspections.filter(i => i.result === 'PASS').length;
+            const failed = total - passed;
+            const passRate = total > 0 ? Math.round((passed / total) * 100) : 0;
+            const failRate = total > 0 ? Math.round((failed / total) * 100) : 0;
+
+            document.getElementById('statsTotal').textContent = total;
+            document.getElementById('statsPass').textContent = passed;
+            document.getElementById('statsFail').textContent = failed;
+            document.getElementById('statsPassRate').textContent = passRate + '%';
+            document.getElementById('statsFailRate').textContent = failRate + '%';
+
+            // Pass rate bar
+            const passRateBar = document.getElementById('passRateBar');
+            const passRateBarText = document.getElementById('passRateBarText');
+            passRateBar.style.width = passRate + '%';
+            passRateBarText.textContent = passRate + '%';
+
+            // Donut chart
+            const circumference = 2 * Math.PI * 85;
+            const passArc = (passed / total) * circumference || 0;
+            const failArc = (failed / total) * circumference || 0;
+            
+            document.getElementById('donutPass').setAttribute('stroke-dasharray', `${passArc} ${circumference}`);
+            document.getElementById('donutPass').setAttribute('stroke-dashoffset', '0');
+            
+            document.getElementById('donutFail').setAttribute('stroke-dasharray', `${failArc} ${circumference}`);
+            document.getElementById('donutFail').setAttribute('stroke-dashoffset', `-${passArc}`);
+            
+            document.getElementById('donutValue').textContent = total;
+
+            // Defect type breakdown
+            const defectCounts = {};
+            state.inspections.forEach(insp => {
+                if (insp.defectType !== 'None') {
+                    defectCounts[insp.defectType] = (defectCounts[insp.defectType] || 0) + 1;
+                }
+            });
+
+            const defectTableBody = document.getElementById('defectTableBody');
+            if (Object.keys(defectCounts).length === 0) {
+                defectTableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: #888;">No defects detected</td></tr>';
+            } else {
+                defectTableBody.innerHTML = Object.entries(defectCounts).map(([type, count]) => {
+                    const percentage = Math.round((count / failed) * 100);
+                    return `
+                        <tr>
+                            <td><span class="badge fail">${type}</span></td>
+                            <td>${count}</td>
+                            <td>${percentage}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // Data Upload Tab
+        function setupFileUpload(zoneId, inputId, listId, fileType) {
+            const zone = document.getElementById(zoneId);
+            const input = document.getElementById(inputId);
+            const list = document.getElementById(listId);
+
+            zone.addEventListener('click', () => input.click());
+            
+            zone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                zone.classList.add('dragover');
+            });
+
+            zone.addEventListener('dragleave', () => {
+                zone.classList.remove('dragover');
+            });
+
+            zone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) uploadFile(file, fileType, list);
+            });
+
+            input.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) uploadFile(file, fileType, list);
+            });
+        }
+
+        function uploadFile(file, type, listElement) {
+            const fileData = {
+                id: Date.now(),
+                name: file.name,
+                size: formatFileSize(file.size),
+                type: file.type,
+                uploadTime: new Date().toLocaleString(),
+                blob: file
+            };
+
+            state.uploadedFiles[type].push(fileData);
+            displayFileList(type, listElement);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function displayFileList(type, listElement) {
+            const files = state.uploadedFiles[type];
+            
+            listElement.innerHTML = files.map(file => `
+                <div class="file-item">
+                    <div class="file-info">
+                        <div class="file-icon">📁</div>
+                        <div class="file-details">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-meta">${file.size} • ${file.uploadTime}</div>
+                        </div>
+                        <span class="badge ready">READY</span>
+                    </div>
+                    <div class="file-actions">
+                        <button class="btn btn-secondary btn-small" onclick="downloadFile('${type}', ${file.id})">Download</button>
+                        <button class="btn btn-danger btn-small" onclick="deleteFile('${type}', ${file.id})">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function downloadFile(type, id) {
+            const file = state.uploadedFiles[type].find(f => f.id === id);
+            if (!file) return;
+            
+            const url = URL.createObjectURL(file.blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function deleteFile(type, id) {
+            state.uploadedFiles[type] = state.uploadedFiles[type].filter(f => f.id !== id);
+            const listElement = type === 'training' ? 
+                document.getElementById('trainingFileList') : 
+                document.getElementById('workerFileList');
+            displayFileList(type, listElement);
+        }
+
+        setupFileUpload('trainingUploadZone', 'trainingInput', 'trainingFileList', 'training');
+        setupFileUpload('workerUploadZone', 'workerInput', 'workerFileList', 'worker');
+
+        // System Downloads
+        document.getElementById('downloadInspectionReport').addEventListener('click', () => {
+            const headers = ['Timestamp', 'Filename', 'Result', 'Confidence', 'Defect Type', 'Inference Time', 'Worker ID'];
+            const rows = state.inspections.map(i => [
+                new Date(i.timestamp).toISOString(),
+                i.filename,
+                i.result,
+                i.confidence,
+                i.defectType,
+                i.inferenceTime,
+                i.workerId
+            ]);
+            
+            const csv = [headers, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
+            downloadCSV(csv, 'inspection_report.csv');
+        });
+
+        document.getElementById('downloadComplianceLog').addEventListener('click', () => {
+            const headers = ['Worker ID', 'Name', 'Shift', 'Document', 'Time', 'Status'];
+            const rows = state.workers.map(w => [
+                w.id,
+                w.name,
+                w.shift,
+                w.document || 'N/A',
+                w.time || 'N/A',
+                w.status
+            ]);
+            
+            const csv = [headers, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
+            downloadCSV(csv, 'compliance_log.csv');
+        });
+
+        document.getElementById('downloadSystemConfig').addEventListener('click', () => {
+            const config = {
+                version: '1.0.0',
+                timestamp: new Date().toISOString(),
+                totalInspections: state.inspections.length,
+                totalWorkers: state.workers.length,
+                settings: {
+                    theme: 'dark',
+                    autoSave: true,
+                    notifications: true
+                }
+            };
+            
+            downloadJSON(config, 'system_config.json');
+        });
+
+        // Compliance Tab
+        function updateComplianceStats() {
+            const compliant = state.workers.filter(w => w.status === 'SUBMITTED').length;
+            const missing = state.workers.filter(w => w.status === 'MISSING').length;
+            const total = state.workers.length;
+            const rate = total > 0 ? Math.round((compliant / total) * 100) : 100;
+
+            document.getElementById('compliantCount').textContent = compliant;
+            document.getElementById('missingWorkerCount').textContent = missing;
+            document.getElementById('complianceRate').textContent = rate + '%';
+
+            const alert = document.getElementById('complianceAlert');
+            const missingCount = document.getElementById('missingCount');
+            if (missing > 0) {
+                alert.style.display = 'flex';
+                missingCount.textContent = missing;
+            } else {
+                alert.style.display = 'none';
+            }
+
+            renderWorkerTable();
+        }
+
+        function renderWorkerTable() {
+            const tbody = document.getElementById('workerTableBody');
+            
+            tbody.innerHTML = state.workers.map(worker => `
+                <tr>
+                    <td>${worker.id}</td>
+                    <td>${worker.name}</td>
+                    <td>${worker.shift}</td>
+                    <td>${worker.document || '-'}</td>
+                    <td>${worker.time || '-'}</td>
+                    <td>
+                        <div class="status-dot-indicator">
+                            <span class="status-dot-${worker.status === 'SUBMITTED' ? 'green' : 'red'}"></span>
+                            <span class="badge ${worker.status.toLowerCase()}">${worker.status}</span>
+                        </div>
+                    </td>
+                    <td>
+                        ${worker.status === 'SUBMITTED' ? 
+                            `<button class="btn btn-secondary btn-small" onclick="downloadWorkerDoc('${worker.id}')">Download Doc</button>` :
+                            `<button class="btn btn-primary btn-small" onclick="markSubmitted('${worker.id}')">Mark Submitted</button>`
+                        }
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function markSubmitted(workerId) {
+            const worker = state.workers.find(w => w.id === workerId);
+            if (worker) {
+                worker.status = 'SUBMITTED';
+                worker.document = 'Document.pdf';
+                worker.time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                updateComplianceStats();
+            }
+        }
+
+        function downloadWorkerDoc(workerId) {
+            const worker = state.workers.find(w => w.id === workerId);
+            if (!worker || !worker.document) return;
+            
+            const content = `Worker Safety Document\n\nWorker ID: ${worker.id}\nName: ${worker.name}\nShift: ${worker.shift}\nSubmitted: ${worker.time}\nStatus: ${worker.status}`;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = worker.document;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('addWorkerBtn').addEventListener('click', () => {
+            const form = document.getElementById('addWorkerForm');
+            form.classList.toggle('active');
+        });
+
+        document.getElementById('submitWorkerBtn').addEventListener('click', () => {
+            const id = document.getElementById('workerIdInput').value;
+            const name = document.getElementById('workerNameInput').value;
+            const shift = document.getElementById('workerShiftInput').value;
+            
+            if (id && name && shift) {
+                state.workers.push({
+                    id: id,
+                    name: name,
+                    shift: shift,
+                    document: null,
+                    time: null,
+                    status: 'MISSING'
+                });
+                
+                document.getElementById('workerIdInput').value = '';
+                document.getElementById('workerNameInput').value = '';
+                document.getElementById('workerShiftInput').value = '';
+                document.getElementById('addWorkerForm').classList.remove('active');
+                
+                updateComplianceStats();
+            }
+        });
+
+        updateComplianceStats();
+
+        // Export Tab
+        function updateExportCounts() {
+            document.getElementById('exportInspectionCount').textContent = state.inspections.length + ' records';
+            document.getElementById('exportComplianceCount').textContent = state.workers.length + ' workers';
+            document.getElementById('exportFullCount').textContent = 'All data';
+        }
+
+        document.getElementById('exportInspectionCSV').addEventListener('click', () => {
+            const headers = ['Timestamp', 'Filename', 'Result', 'Confidence', 'Defect Type', 'Inference Time', 'Worker ID'];
+            const rows = state.inspections.map(i => [
+                new Date(i.timestamp).toISOString(),
+                i.filename,
+                i.result,
+                i.confidence,
+                i.defectType,
+                i.inferenceTime,
+                i.workerId
+            ]);
+            
+            const csv = [headers, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
+            downloadCSV(csv, 'inspection_report.csv');
+        });
+
+        document.getElementById('exportComplianceCSV').addEventListener('click', () => {
+            const headers = ['Worker ID', 'Name', 'Shift', 'Document', 'Time', 'Status'];
+            const rows = state.workers.map(w => [
+                w.id,
+                w.name,
+                w.shift,
+                w.document || 'N/A',
+                w.time || 'N/A',
+                w.status
+            ]);
+            
+            const csv = [headers, ...rows].map(row => row.map(escapeCSV).join(',')).join('\n');
+            downloadCSV(csv, 'worker_compliance.csv');
+        });
+
+        document.getElementById('exportConfigJSON').addEventListener('click', () => {
+            const config = {
+                version: '1.0.0',
+                timestamp: new Date().toISOString(),
+                totalInspections: state.inspections.length,
+                totalWorkers: state.workers.length,
+                settings: {
+                    theme: 'dark-industrial',
+                    autoSave: true,
+                    notifications: true
+                }
+            };
+            
+            downloadJSON(config, 'system_config.json');
+        });
+
+        document.getElementById('exportFullJSON').addEventListener('click', () => {
+            const fullData = {
+                exportDate: new Date().toISOString(),
+                inspections: state.inspections,
+                workers: state.workers,
+                uploadedFiles: {
+                    training: state.uploadedFiles.training.map(f => ({
+                        id: f.id,
+                        name: f.name,
+                        size: f.size,
+                        uploadTime: f.uploadTime
+                    })),
+                    worker: state.uploadedFiles.worker.map(f => ({
+                        id: f.id,
+                        name: f.name,
+                        size: f.size,
+                        uploadTime: f.uploadTime
+                    }))
+                },
+                statistics: {
+                    totalInspections: state.inspections.length,
+                    passCount: state.inspections.filter(i => i.result === 'PASS').length,
+                    failCount: state.inspections.filter(i => i.result === 'FAIL').length,
+                    complianceRate: state.workers.length > 0 ? 
+                        Math.round((state.workers.filter(w => w.status === 'SUBMITTED').length / state.workers.length) * 100) : 100
+                }
+            };
+            
+            downloadJSON(fullData, 'full_report.json');
+        });
+
+        // Helper functions
+        function escapeCSV(value) {
+            if (value == null) return '';
+            const str = String(value);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        }
+
+        function downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadJSON(data, filename) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Update export counts periodically
+        setInterval(updateExportCounts, 1000);
+        updateExportCounts();
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // ADVANCED FEATURES - Toast Notifications
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        function showToast(title, message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-header">
+                    <div class="toast-title">${icons[type] || '✅'} ${title}</div>
+                    <button class="toast-close" onclick="this.parentElement.parentElement.remove()">×</button>
+                </div>
+                <div class="toast-message">${message}</div>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Play sound if enabled
+            if (state.settings.soundEnabled) {
+                playNotificationSound(type);
+            }
+            
+            // Auto dismiss after 4 seconds
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.style.opacity = '0';
+                    toast.style.transform = 'translateX(400px)';
+                    setTimeout(() => toast.remove(), 300);
+                }
+            }, 4000);
+        }
+
+        // Sound notifications
+        function playNotificationSound(type) {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            const frequencies = {
+                success: [523.25, 659.25],  // C5, E5
+                error: [392.00, 349.23],     // G4, F4
+                warning: [440.00, 493.88],   // A4, B4
+                info: [587.33, 523.25]       // D5, C5
+            };
+            
+            const freq = frequencies[type] || frequencies.success;
+            
+            oscillator.frequency.setValueAtTime(freq[0], audioContext.currentTime);
+            oscillator.frequency.setValueAtTime(freq[1], audioContext.currentTime + 0.1);
+            
+            gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+            
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // SETTINGS PANEL
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        // Add settings to state
+        state.settings = {
+            soundEnabled: true,
+            autoRefresh: false,
+            showAnimations: true,
+            compactMode: false,
+            theme: 'dark'
+        };
+
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            panel.classList.toggle('active');
+        }
+
+        function toggleSetting(settingName) {
+            state.settings[settingName] = !state.settings[settingName];
+            const toggle = document.getElementById(settingName + 'Toggle');
+            if (toggle) {
+                toggle.classList.toggle('active');
+            }
+            
+            // Apply setting immediately
+            if (settingName === 'soundEnabled') {
+                showToast('Settings', `Sound notifications ${state.settings[settingName] ? 'enabled' : 'disabled'}`, 'info');
+            }
+            if (settingName === 'autoRefresh') {
+                showToast('Settings', `Auto-refresh ${state.settings[settingName] ? 'enabled' : 'disabled'}`, 'info');
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // KEYBOARD SHORTCUTS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        document.addEventListener('keydown', (e) => {
+            // Ctrl/Cmd + K: Toggle settings
+            if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                e.preventDefault();
+                toggleSettings();
+            }
+            
+            // Ctrl/Cmd + U: Upload file (in inspect tab)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'u') {
+                e.preventDefault();
+                const activeTab = document.querySelector('.tab.active').dataset.tab;
+                if (activeTab === 'inspect') {
+                    document.getElementById('imageInput').click();
+                }
+            }
+            
+            // Ctrl/Cmd + 1-6: Switch tabs
+            if ((e.ctrlKey || e.metaKey) && e.key >= '1' && e.key <= '6') {
+                e.preventDefault();
+                const tabs = ['inspect', 'stats', 'history', 'data-upload', 'compliance', 'export'];
+                const tabIndex = parseInt(e.key) - 1;
+                if (tabs[tabIndex]) {
+                    document.querySelector(`[data-tab="${tabs[tabIndex]}"]`).click();
+                }
+            }
+            
+            // F: Toggle fullscreen for current inspection
+            if (e.key === 'f' && state.currentInspection) {
+                toggleFullscreen();
+            }
+            
+            // ?: Show keyboard shortcuts help
+            if (e.key === '?' && !e.shiftKey) {
+                toggleShortcutsHelp();
+            }
+            
+            // Escape: Close overlays
+            if (e.key === 'Escape') {
+                document.getElementById('settingsPanel').classList.remove('active');
+                document.getElementById('fullscreenOverlay').classList.remove('active');
+                document.getElementById('shortcutsHelp').classList.remove('active');
+            }
+        });
+
+        function toggleShortcutsHelp() {
+            const help = document.getElementById('shortcutsHelp');
+            help.classList.toggle('active');
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // FULLSCREEN MODE
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        function toggleFullscreen() {
+            if (!state.currentInspection) return;
+            
+            const overlay = document.getElementById('fullscreenOverlay');
+            const content = document.getElementById('fullscreenContent');
+            
+            if (!overlay.classList.contains('active')) {
+                content.innerHTML = `
+                    <img src="${state.currentInspection.imageUrl}" style="max-width: 100%; max-height: 100%; border-radius: 12px;">
+                    <div style="position: absolute; top: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 1rem; border-radius: 8px;">
+                        <div style="font-family: 'IBM Plex Mono', monospace; color: #00FFB2; font-size: 1.5rem; font-weight: 700;">
+                            ${state.currentInspection.result}
+                        </div>
+                        <div style="color: #888; margin-top: 0.5rem;">
+                            Confidence: ${state.currentInspection.confidence}%<br>
+                            Defect: ${state.currentInspection.defectType}<br>
+                            Time: ${state.currentInspection.inferenceTime}ms
+                        </div>
+                    </div>
+                `;
+                overlay.classList.add('active');
+                showToast('Fullscreen', 'Press ESC or F to exit fullscreen', 'info');
+            } else {
+                overlay.classList.remove('active');
+            }
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // SEARCH & FILTER
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        function searchHistory(query) {
+            const items = document.querySelectorAll('.history-item');
+            let visibleCount = 0;
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if (text.includes(query.toLowerCase())) {
+                    item.style.display = 'flex';
+                    visibleCount++;
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+            
+            if (visibleCount === 0 && query) {
+                document.getElementById('historyList').innerHTML = '<div style="text-align: center; color: #888; padding: 3rem;">No matches found</div>';
+            } else if (visibleCount === 0) {
+                updateHistory();
+            }
+        }
+
+        function searchCompliance(query) {
+            const rows = document.querySelectorAll('#workerTableBody tr');
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                if (text.includes(query.toLowerCase())) {
+                    row.style.display = 'table-row';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // PRINT FUNCTIONALITY
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        function printReport() {
+            const printWindow = window.open('', '_blank');
+            const reportContent = `
+                <html>
+                <head>
+                    <title>AutoQI Inspection Report</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 2rem; }
+                        h1 { color: #00FFB2; border-bottom: 2px solid #00FFB2; padding-bottom: 0.5rem; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+                        th, td { border: 1px solid #ddd; padding: 0.75rem; text-align: left; }
+                        th { background: #f5f5f5; font-weight: bold; }
+                        .pass { color: green; font-weight: bold; }
+                        .fail { color: red; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <h1>AutoQI - Quality Inspection Report</h1>
+                    <p>Generated: ${new Date().toLocaleString()}</p>
+                    <p>Total Inspections: ${state.inspections.length}</p>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Filename</th>
+                                <th>Result</th>
+                                <th>Confidence</th>
+                                <th>Defect Type</th>
+                                <th>Worker ID</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${state.inspections.map(i => `
+                                <tr>
+                                    <td>${new Date(i.timestamp).toLocaleString()}</td>
+                                    <td>${i.filename}</td>
+                                    <td class="${i.result.toLowerCase()}">${i.result}</td>
+                                    <td>${i.confidence}%</td>
+                                    <td>${i.defectType}</td>
+                                    <td>${i.workerId}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            
+            printWindow.document.write(reportContent);
+            printWindow.document.close();
+            setTimeout(() => {
+                printWindow.print();
+            }, 250);
+            
+            showToast('Print', 'Opening print dialog...', 'info');
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // ENHANCED EVENT LISTENERS WITH TOASTS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        // Override existing functions to add toast notifications
+        const originalDisplayResult = displayResult;
+        displayResult = function(inspection) {
+            originalDisplayResult(inspection);
+            const resultType = inspection.result === 'PASS' ? 'success' : 'warning';
+            showToast(
+                `Inspection ${inspection.result}`,
+                `${inspection.filename} - ${inspection.confidence}% confidence`,
+                resultType
+            );
+        };
+
+        // Add toast to file uploads
+        const originalUploadFile = uploadFile;
+        uploadFile = function(file, type, listElement) {
+            originalUploadFile(file, type, listElement);
+            showToast('File Uploaded', `${file.name} added successfully`, 'success');
+        };
+
+        // Add toast to file deletions
+        const originalDeleteFile = deleteFile;
+        deleteFile = function(type, id) {
+            const file = state.uploadedFiles[type].find(f => f.id === id);
+            originalDeleteFile(type, id);
+            showToast('File Deleted', `${file.name} removed`, 'info');
+        };
+
+        // Add toast to worker submissions
+        const originalMarkSubmitted = markSubmitted;
+        markSubmitted = function(workerId) {
+            const worker = state.workers.find(w => w.id === workerId);
+            originalMarkSubmitted(workerId);
+            showToast('Worker Updated', `${worker.name} marked as submitted`, 'success');
+        };
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // PERFORMANCE METRICS
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        function getPerformanceBadge() {
+            const total = state.inspections.length;
+            if (total === 0) return { text: 'N/A', class: 'perf-average' };
+            
+            const passed = state.inspections.filter(i => i.result === 'PASS').length;
+            const passRate = (passed / total) * 100;
+            
+            if (passRate >= 95) return { text: 'EXCELLENT', class: 'perf-excellent' };
+            if (passRate >= 80) return { text: 'GOOD', class: 'perf-good' };
+            if (passRate >= 60) return { text: 'AVERAGE', class: 'perf-average' };
+            return { text: 'NEEDS ATTENTION', class: 'perf-poor' };
+        }
+
+        // Update performance badge in stats
+        setInterval(() => {
+            const badge = getPerformanceBadge();
+            const existing = document.querySelector('.perf-badge');
+            if (existing) {
+                existing.className = `perf-badge ${badge.class}`;
+                existing.textContent = badge.text;
+            }
+        }, 2000);
+
+        // Welcome toast on load
+        setTimeout(() => {
+            showToast('Welcome to AutoQI', 'Dashboard ready. Press ? for keyboard shortcuts', 'success');
+        }, 1000);
+    </script>
+
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Settings Button & Panel -->
+    <button class="settings-btn" onclick="toggleSettings()" title="Settings (Ctrl+K)">
+        ⚙️
+    </button>
+
+    <div id="settingsPanel" class="settings-panel">
+        <div class="settings-header">
+            <div class="settings-title">⚙️ Settings</div>
+            <button class="settings-close" onclick="toggleSettings()">×</button>
+        </div>
+
+        <div class="settings-section">
+            <label class="settings-label">Notifications</label>
+            <div class="toggle-switch">
+                <span>Sound Effects</span>
+                <div id="soundEnabledToggle" class="switch active" onclick="toggleSetting('soundEnabled')">
+                    <div class="switch-slider"></div>
+                </div>
+            </div>
+            <div class="toggle-switch">
+                <span>Auto Refresh Stats</span>
+                <div id="autoRefreshToggle" class="switch" onclick="toggleSetting('autoRefresh')">
+                    <div class="switch-slider"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <label class="settings-label">Display</label>
+            <div class="toggle-switch">
+                <span>Animations</span>
+                <div id="showAnimationsToggle" class="switch active" onclick="toggleSetting('showAnimations')">
+                    <div class="switch-slider"></div>
+                </div>
+            </div>
+            <div class="toggle-switch">
+                <span>Compact Mode</span>
+                <div id="compactModeToggle" class="switch" onclick="toggleSetting('compactMode')">
+                    <div class="switch-slider"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <label class="settings-label">Actions</label>
+            <button class="btn btn-primary" style="width: 100%; margin-bottom: 0.5rem;" onclick="printReport()">
+                🖨️ Print Report
+            </button>
+            <button class="btn btn-secondary" style="width: 100%;" onclick="location.reload()">
+                🔄 Reload Dashboard
+            </button>
+        </div>
+
+        <div class="settings-section">
+            <label class="settings-label">About</label>
+            <div style="color: #888; font-size: 0.875rem;">
+                <strong style="color: #00FFB2;">AutoQI Dashboard</strong><br>
+                Version 2.0.0<br>
+                © 2026 AutoQI Systems
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Help -->
+    <div id="shortcutsHelp" class="shortcuts-help">
+        <div style="font-weight: 700; color: #00FFB2; margin-bottom: 1rem;">⌨️ Keyboard Shortcuts</div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl+K</span>
+            <span class="shortcut-desc">Toggle Settings</span>
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl+U</span>
+            <span class="shortcut-desc">Upload Image</span>
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">Ctrl+1-6</span>
+            <span class="shortcut-desc">Switch Tabs</span>
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">F</span>
+            <span class="shortcut-desc">Fullscreen (when viewing)</span>
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">?</span>
+            <span class="shortcut-desc">Toggle This Help</span>
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">ESC</span>
+            <span class="shortcut-desc">Close Overlays</span>
+        </div>
+    </div>
+
+    <!-- Fullscreen Overlay -->
+    <div id="fullscreenOverlay" class="fullscreen-overlay">
+        <button class="fullscreen-close" onclick="toggleFullscreen()">×</button>
+        <div id="fullscreenContent" class="fullscreen-content"></div>
+    </div>
+
+</body>
+</html>
