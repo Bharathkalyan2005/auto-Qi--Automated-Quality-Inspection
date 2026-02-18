@@ -114,7 +114,8 @@ https://autoqi.yourdomain.com
       "src": "/",
       "dest": "/autoqi_dashboard.html"
     }
-  ]
+  ],
+  "headers": [...]
 }
 ```
 
