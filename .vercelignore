@@ -1,0 +1,61 @@
+# Python source code
+src/
+models/
+tests/
+dashboard/
+
+# Python config files
+*.py
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Python dependency files
+requirements.txt
+Pipfile
+Pipfile.lock
+pyproject.toml
+poetry.lock
+
+# Testing
+pytest.ini
+conftest.py
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Docker
+docker/
+docker-compose.yml
+Dockerfile
+
+# Logs
+logs/
+*.log
+
+# Data folders
+data/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Streamlit
+.streamlit/
